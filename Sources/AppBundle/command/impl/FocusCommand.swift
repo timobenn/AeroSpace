@@ -36,6 +36,37 @@ struct FocusCommand: Command {
                 } else {
                     return io.err("Can't find window with DFS index \(dfsIndex)")
                 }
+            case .dfsRelative(let dfsDirection):
+                if let window = target.windowOrNil {
+                    let workspaceWindows = target.workspace.rootTilingContainer.allLeafWindowsRecursive
+                    if let currIndex = workspaceWindows.firstIndex(of: window) {
+                        // TODO: wrapping across monitors
+                        // TODO: respect boundary options: halt, wrap workspace, wrap all workspaces in monitor
+                        let dfsIndex =
+                            if dfsDirection.isPositive {
+                                if workspaceWindows.count - 1 == currIndex {
+                                    0
+                                } else {
+                                    currIndex + 1
+                                }
+                            } else {
+                                if currIndex == 0 {
+                                    workspaceWindows.count - 1
+                                } else {
+                                    currIndex - 1
+                                }
+                            }
+                        if let windowToFocus = workspaceWindows.getOrNil(atIndex: Int(dfsIndex)) {
+                            return windowToFocus.focusWindow()
+                        } else {
+                            return io.err("Can't find window with DFS index \(dfsIndex)")
+                        }
+                    } else {
+                        return io.err("Can't get index of current window")
+                    }
+                } else {
+                    return io.err("Can't get index of current window")
+                }
         }
     }
 }

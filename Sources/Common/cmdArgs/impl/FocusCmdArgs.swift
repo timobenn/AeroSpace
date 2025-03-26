@@ -15,19 +15,26 @@ public struct FocusCmdArgs: CmdArgs {
             "--window-id": ArgParser(\.windowId, upcastArgParserFun(parseArgWithUInt32)),
             "--dfs-index": ArgParser(\.dfsIndex, upcastArgParserFun(parseArgWithUInt32)),
         ],
-        arguments: [ArgParser(\.direction, upcastArgParserFun(parseCardinalDirectionArg))]
+        arguments: [
+            newArgParser(
+                \.directionOrRelativeTarget, parseDirectionOrRelative,
+                mandatoryArgPlaceholder: "(left|down|up|right|dfs-next|dfs-prev)")
+        ]
     )
 
     public var rawBoundaries: Boundaries? = nil // todo cover boundaries wrapping with tests
     public var rawBoundariesAction: WhenBoundariesCrossed? = nil
     public var dfsIndex: UInt32? = nil
+    public var dfsRelative: DfsRelative? = nil
     public var direction: CardinalDirection? = nil
     public var floatingAsTiling: Bool = true
+    public var directionOrRelativeTarget: Lateinit<DirectionOrRelativeTarget> = .uninitialized
     public var windowId: UInt32?
     public var workspaceName: WorkspaceName?
 
     public init(rawArgs: [String], direction: CardinalDirection) {
         self.rawArgs = .init(rawArgs)
+        // TODO: still need this init?
         self.direction = direction
     }
 
@@ -53,28 +60,59 @@ public struct FocusCmdArgs: CmdArgs {
     }
 }
 
+func parseDirectionOrRelative(_ arg: String, _ nextArgs: inout [String]) -> Parsed<
+    DirectionOrRelativeTarget
+> {
+    switch arg {
+    case "dfs-next":
+        return .success(.dfsRelative(.dfsNext))
+    case "dfs-prev":
+        return .success(.dfsRelative(.dfsPrev))
+    case "left":
+        return .success(.directional(.left))
+    case "down":
+        return .success(.directional(.down))
+    case "up":
+        return .success(.directional(.up))
+    case "right":
+        return .success(.directional(.right))
+    default:
+        return .failure("\(arg) invalid")
+    }
+}
+
 public enum FocusCmdTarget {
     case direction(CardinalDirection)
     case windowId(UInt32)
     case dfsIndex(UInt32)
+    case dfsRelative(DfsRelative)
 }
 
-public extension FocusCmdArgs {
-    var target: FocusCmdTarget {
-        if let direction {
-            return .direction(direction)
-        }
+extension FocusCmdArgs {
+    public var target: FocusCmdTarget {
         if let windowId {
             return .windowId(windowId)
         }
         if let dfsIndex {
             return .dfsIndex(dfsIndex)
         }
-        error("Parser invariants are broken")
+        switch directionOrRelativeTarget {
+        case .initialized(.directional(let dir)):
+            return .direction(dir)
+        case .initialized(.dfsRelative(let rel)):
+            return .dfsRelative(rel)
+        case .uninitialized:
+            error("Parser invariants are broken")
+        }
     }
 
-    var boundaries: Boundaries { rawBoundaries ?? .workspace }
-    var boundariesAction: WhenBoundariesCrossed { rawBoundariesAction ?? .stop }
+    public var boundaries: Boundaries { rawBoundaries ?? .workspace }
+    public var boundariesAction: WhenBoundariesCrossed { rawBoundariesAction ?? .stop }
+}
+
+public enum DirectionOrRelativeTarget: Equatable, Sendable {
+    case directional(CardinalDirection)
+    case dfsRelative(DfsRelative)
 }
 
 public func parseFocusCmdArgs(_ args: [String]) -> ParsedCmd<FocusCmdArgs> {
@@ -84,8 +122,12 @@ public func parseFocusCmdArgs(_ args: [String]) -> ParsedCmd<FocusCmdArgs> {
                 ? .failure("\(raw.boundaries.rawValue) and \(raw.boundariesAction.rawValue) is an invalid combination of values")
                 : .cmd(raw)
         }
-        .filter("Mandatory argument is missing. '\(CardinalDirection.unionLiteral)', --window-id or --dfs-index is required") {
-            $0.direction != nil || $0.windowId != nil || $0.dfsIndex != nil
+        .filter(
+            // TODO: list all options
+            "Mandatory argument is missing. '\(CardinalDirection.unionLiteral)', --window-id or --dfs-index is required"
+        ) {
+            $0.windowId != nil || $0.dfsIndex != nil
+                || $0.directionOrRelativeTarget != .uninitialized
         }
         .filter("--window-id is incompatible with other options") {
             $0.windowId == nil || $0 == FocusCmdArgs(rawArgs: args, windowId: $0.windowId!)
