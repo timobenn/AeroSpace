@@ -50,7 +50,7 @@ struct FocusCommand: Command {
                         return io.err("Can't get index of current window")
                     }
                 } else {
-                    return io.err("Can't get index of current window")
+                    return hitWorkspaceBoundaries(target, io, args, .dfs(dfsDirection))
                 }
         }
     }
@@ -95,10 +95,6 @@ struct FocusCommand: Command {
                     guard let (monitors, index) = currentMonitor.findRelativeMonitor(inDirection: direction) else {
                         return io.err("Can't find monitor in direction \(direction)")
                     }
-
-                    // TODO: test how cardinal directions behave with empty monitors, I don't like
-                    // how .dfs handles it currently (it effectively stops), but not sure if
-                    // .cardinal is similar
 
                     if let targetMonitor = monitors.getOrNil(atIndex: index) {
                         return targetMonitor.activeWorkspace.focusWorkspace()
