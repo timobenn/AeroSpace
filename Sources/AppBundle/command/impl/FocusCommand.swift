@@ -22,7 +22,7 @@ struct FocusCommand: Command {
                         .findFocusTargetRecursive(snappedTo: direction.opposite) else { return false }
                     return windowToFocus.focusWindow()
                 } else {
-                    return hitWorkspaceBoundaries(target, io, args, direction)
+                    return hitWorkspaceBoundaries(target, io, args, .cardinal(direction))
                 }
             case .windowId(let windowId):
                 if let windowToFocus = Window.get(byId: windowId) {
@@ -40,26 +40,11 @@ struct FocusCommand: Command {
                 if let window = target.windowOrNil {
                     let workspaceWindows = target.workspace.rootTilingContainer.allLeafWindowsRecursive
                     if let currIndex = workspaceWindows.firstIndex(of: window) {
-                        // TODO: wrapping across monitors
-                        // TODO: respect boundary options: halt, wrap workspace, wrap all workspaces in monitor
-                        let dfsIndex =
-                            if dfsDirection.isPositive {
-                                if workspaceWindows.count - 1 == currIndex {
-                                    0
-                                } else {
-                                    currIndex + 1
-                                }
-                            } else {
-                                if currIndex == 0 {
-                                    workspaceWindows.count - 1
-                                } else {
-                                    currIndex - 1
-                                }
-                            }
+                        let dfsIndex = dfsDirection.isPositive ? currIndex + 1 : currIndex - 1
                         if let windowToFocus = workspaceWindows.getOrNil(atIndex: Int(dfsIndex)) {
                             return windowToFocus.focusWindow()
                         } else {
-                            return io.err("Can't find window with DFS index \(dfsIndex)")
+                            return hitWorkspaceBoundaries(target, io, args, .dfs(dfsDirection))
                         }
                     } else {
                         return io.err("Can't get index of current window")
@@ -75,7 +60,7 @@ struct FocusCommand: Command {
     _ target: LiveFocus,
     _ io: CmdIo,
     _ args: FocusCmdArgs,
-    _ direction: CardinalDirection
+    _ direction: CardinalOrDfsDirection
 ) -> Bool {
     switch args.boundaries {
         case .workspace:
@@ -87,15 +72,40 @@ struct FocusCommand: Command {
             }
         case .allMonitorsUnionFrame:
             let currentMonitor = target.workspace.workspaceMonitor
-            guard let (monitors, index) = currentMonitor.findRelativeMonitor(inDirection: direction) else {
-                return io.err("Can't find monitor in direction \(direction)")
-            }
+            switch direction {
+                case .dfs(let direction):
+                    let monitors = sortedMonitors
+                    guard let curIndex = monitors.firstIndex(where: { $0.rect.topLeftCorner == currentMonitor.rect.topLeftCorner }) else {
+                        return io.err("Can't find current monitor")
+                    }
+                    let targetIndex = direction == .dfsNext ? curIndex + 1 : curIndex - 1
+                    if let targetMonitor = monitors.getOrNil(atIndex: targetIndex) {
+                        let workspaceWindows = targetMonitor.activeWorkspace.rootTilingContainer.allLeafWindowsRecursive
+                        if direction.isPositive {
+                            workspaceWindows.getOrNil(atIndex: 0)?.markAsMostRecentChild()
+                        } else {
+                            workspaceWindows.getOrNil(atIndex: workspaceWindows.count - 1)?.markAsMostRecentChild()
+                        }
+                        return targetMonitor.activeWorkspace.focusWorkspace()
+                    } else {
+                        guard let wrapped = monitors.get(wrappingIndex: targetIndex) else { return false }
+                        return hitAllMonitorsOuterFrameBoundaries(target, io, args, .dfs(direction), wrapped)
+                    }
+                case .cardinal(let direction):
+                    guard let (monitors, index) = currentMonitor.findRelativeMonitor(inDirection: direction) else {
+                        return io.err("Can't find monitor in direction \(direction)")
+                    }
 
-            if let targetMonitor = monitors.getOrNil(atIndex: index) {
-                return targetMonitor.activeWorkspace.focusWorkspace()
-            } else {
-                guard let wrapped = monitors.get(wrappingIndex: index) else { return false }
-                return hitAllMonitorsOuterFrameBoundaries(target, io, args, direction, wrapped)
+                    // TODO: test how cardinal directions behave with empty monitors, I don't like
+                    // how .dfs handles it currently (it effectively stops), but not sure if
+                    // .cardinal is similar
+
+                    if let targetMonitor = monitors.getOrNil(atIndex: index) {
+                        return targetMonitor.activeWorkspace.focusWorkspace()
+                    } else {
+                        guard let wrapped = monitors.get(wrappingIndex: index) else { return false }
+                        return hitAllMonitorsOuterFrameBoundaries(target, io, args, .cardinal(direction), wrapped)
+                    }
             }
     }
 }
@@ -104,7 +114,7 @@ struct FocusCommand: Command {
     _ target: LiveFocus,
     _ io: CmdIo,
     _ args: FocusCmdArgs,
-    _ direction: CardinalDirection,
+    _ direction: CardinalOrDfsDirection,
     _ wrappedMonitor: Monitor
 ) -> Bool {
     switch args.boundariesAction {
@@ -115,15 +125,37 @@ struct FocusCommand: Command {
         case .wrapAroundTheWorkspace:
             return wrapAroundTheWorkspace(target, io, direction)
         case .wrapAroundAllMonitors:
-            wrappedMonitor.activeWorkspace.findFocusTargetRecursive(snappedTo: direction.opposite)?.markAsMostRecentChild()
+            switch direction {
+            case .dfs(let direction):
+                let workspaceWindows = wrappedMonitor.activeWorkspace.rootTilingContainer.allLeafWindowsRecursive
+                if direction.isPositive {
+                    workspaceWindows.getOrNil(atIndex: 0)?.markAsMostRecentChild()
+                } else {
+                    workspaceWindows.getOrNil(atIndex: workspaceWindows.count - 1)?.markAsMostRecentChild()
+                }
+            case .cardinal(let direction):
+                wrappedMonitor.activeWorkspace.findFocusTargetRecursive(snappedTo: direction.opposite)?.markAsMostRecentChild()
+            }
+
             return wrappedMonitor.activeWorkspace.focusWorkspace()
     }
 }
 
-@MainActor private func wrapAroundTheWorkspace(_ target: LiveFocus, _ io: CmdIo, _ direction: CardinalDirection) -> Bool {
-    guard let windowToFocus = target.workspace.findFocusTargetRecursive(snappedTo: direction.opposite) else {
-        return io.err(noWindowIsFocused)
+@MainActor private func wrapAroundTheWorkspace(_ target: LiveFocus, _ io: CmdIo, _ direction: CardinalOrDfsDirection) -> Bool {
+    let workspaceWindows = target.workspace.rootTilingContainer.allLeafWindowsRecursive
+    guard let windowToFocus = switch direction {
+        case .dfs(let direction):
+            if direction.isPositive {
+                workspaceWindows.getOrNil(atIndex: 0)
+            } else {
+                workspaceWindows.getOrNil(atIndex: workspaceWindows.count - 1)
+            }
+        case .cardinal(let direction):
+            target.workspace.findFocusTargetRecursive(snappedTo: direction.opposite) 
+    } else {
+        return io.err(noWindowIsFocused)   
     }
+
     return windowToFocus.focusWindow()
 }
 
