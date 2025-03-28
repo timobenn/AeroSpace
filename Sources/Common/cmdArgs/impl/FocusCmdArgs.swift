@@ -17,7 +17,7 @@ public struct FocusCmdArgs: CmdArgs {
         ],
         arguments: [
             newArgParser(
-                \.directionOrRelativeTarget, parseDirectionOrRelative,
+                \.cardinalOrDfsDirection, parseCardinalOrDfsDirection,
                 mandatoryArgPlaceholder: "(left|down|up|right|dfs-next|dfs-prev)")
         ]
     )
@@ -28,7 +28,7 @@ public struct FocusCmdArgs: CmdArgs {
     public var dfsRelative: DfsRelative? = nil
     public var direction: CardinalDirection? = nil
     public var floatingAsTiling: Bool = true
-    public var directionOrRelativeTarget: Lateinit<CardinalOrDfsDirection> = .uninitialized
+    public var cardinalOrDfsDirection: Lateinit<CardinalOrDfsDirection> = .uninitialized
     public var windowId: UInt32?
     public var workspaceName: WorkspaceName?
 
@@ -37,9 +37,9 @@ public struct FocusCmdArgs: CmdArgs {
         self.direction = direction
     }
 
-    public init(rawArgs: [String], directionOrRelativeTarget: CardinalOrDfsDirection) {
+    public init(rawArgs: [String], cardinalOrDfsDirection: CardinalOrDfsDirection) {
         self.rawArgs = .init(rawArgs)
-        self.directionOrRelativeTarget = .initialized(directionOrRelativeTarget)
+        self.cardinalOrDfsDirection = .initialized(cardinalOrDfsDirection)
     }
 
     public init(rawArgs: [String], windowId: UInt32) {
@@ -64,7 +64,7 @@ public struct FocusCmdArgs: CmdArgs {
     }
 }
 
-func parseDirectionOrRelative(_ arg: String, _ nextArgs: inout [String]) -> Parsed<
+func parseCardinalOrDfsDirection(_ arg: String, _ nextArgs: inout [String]) -> Parsed<
     CardinalOrDfsDirection
 > {
     switch arg {
@@ -100,7 +100,7 @@ extension FocusCmdArgs {
         if let dfsIndex {
             return .dfsIndex(dfsIndex)
         }
-        switch directionOrRelativeTarget {
+        switch cardinalOrDfsDirection {
         case .initialized(.cardinal(let dir)):
             return .direction(dir)
         case .initialized(.dfs(let rel)):
@@ -126,7 +126,7 @@ public func parseFocusCmdArgs(_ args: [String]) -> ParsedCmd<FocusCmdArgs> {
             "Mandatory argument is missing. '\(CardinalDirection.unionLiteral)', --window-id or --dfs-index is required"
         ) {
             $0.windowId != nil || $0.dfsIndex != nil
-                || $0.directionOrRelativeTarget != .uninitialized
+                || $0.cardinalOrDfsDirection != .uninitialized
         }
         .filter("--window-id is incompatible with other options") {
             $0.windowId == nil || $0 == FocusCmdArgs(rawArgs: args, windowId: $0.windowId!)
