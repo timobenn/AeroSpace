@@ -38,6 +38,7 @@ struct FocusCommand: Command {
                 }
             case .dfsRelative(let dfsDirection):
                 if let window = target.windowOrNil {
+                    // TODO: this doesn't include floating windows, update to include them (depending on --ignore-floating)
                     let workspaceWindows = target.workspace.rootTilingContainer.allLeafWindowsRecursive
                     if let currIndex = workspaceWindows.firstIndex(of: window) {
                         let dfsIndex = dfsDirection.isPositive ? currIndex + 1 : currIndex - 1
