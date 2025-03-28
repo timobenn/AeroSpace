@@ -11,7 +11,7 @@ include::util/man-attributes.adoc[]
 // tag::synopsis[]
 aerospace focus [-h|--help] [--ignore-floating]
                 [--boundaries <boundary>] [--boundaries-action <action>]
-                (left|down|up|right)
+                (left|down|up|right|dfs-next|dfs-prev)
 aerospace focus [-h|--help] --window-id <window-id>
 aerospace focus [-h|--help] --dfs-index <dfs-index>
 
@@ -28,6 +28,8 @@ From `focus` command perspective, floating windows are part of xref:guide.adoc#t
 The floating window parent container is determined as the smallest tiling container that contains the center of the floating window.
 The technique eliminates the need for an additional binding for floating windows.
 This behavior can be disabled with `--ignore-floating` flag.
+
+`focus dfs-next|dfs-prev` focuses by incrementing/decrementing the dfs-index as described under --dfs-index, wrapping as needed.
 
 `focus child|parent` isn't supported because the necessity of this operation is under the question.
 https://github.com/nikitabobko/AeroSpace/issues/5

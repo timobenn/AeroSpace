@@ -122,8 +122,7 @@ public func parseFocusCmdArgs(_ args: [String]) -> ParsedCmd<FocusCmdArgs> {
                 : .cmd(raw)
         }
         .filter(
-            // TODO: list all options
-            "Mandatory argument is missing. '\(CardinalDirection.unionLiteral)', --window-id or --dfs-index is required"
+            "Mandatory argument is missing. '\(CardinalOrDfsDirection.unionLiteral)', --window-id or --dfs-index is required"
         ) {
             $0.windowId != nil || $0.dfsIndex != nil
                 || $0.cardinalOrDfsDirection != .uninitialized
