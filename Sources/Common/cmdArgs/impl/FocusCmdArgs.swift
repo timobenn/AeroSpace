@@ -28,14 +28,18 @@ public struct FocusCmdArgs: CmdArgs {
     public var dfsRelative: DfsRelative? = nil
     public var direction: CardinalDirection? = nil
     public var floatingAsTiling: Bool = true
-    public var directionOrRelativeTarget: Lateinit<DirectionOrRelativeTarget> = .uninitialized
+    public var directionOrRelativeTarget: Lateinit<CardinalOrDfsDirection> = .uninitialized
     public var windowId: UInt32?
     public var workspaceName: WorkspaceName?
 
     public init(rawArgs: [String], direction: CardinalDirection) {
         self.rawArgs = .init(rawArgs)
-        // TODO: still need this init?
         self.direction = direction
+    }
+
+    public init(rawArgs: [String], directionOrRelativeTarget: CardinalOrDfsDirection) {
+        self.rawArgs = .init(rawArgs)
+        self.directionOrRelativeTarget = .initialized(directionOrRelativeTarget)
     }
 
     public init(rawArgs: [String], windowId: UInt32) {
@@ -61,21 +65,21 @@ public struct FocusCmdArgs: CmdArgs {
 }
 
 func parseDirectionOrRelative(_ arg: String, _ nextArgs: inout [String]) -> Parsed<
-    DirectionOrRelativeTarget
+    CardinalOrDfsDirection
 > {
     switch arg {
     case "dfs-next":
-        return .success(.dfsRelative(.dfsNext))
+        return .success(.dfs(.dfsNext))
     case "dfs-prev":
-        return .success(.dfsRelative(.dfsPrev))
+        return .success(.dfs(.dfsPrev))
     case "left":
-        return .success(.directional(.left))
+        return .success(.cardinal(.left))
     case "down":
-        return .success(.directional(.down))
+        return .success(.cardinal(.down))
     case "up":
-        return .success(.directional(.up))
+        return .success(.cardinal(.up))
     case "right":
-        return .success(.directional(.right))
+        return .success(.cardinal(.right))
     default:
         return .failure("\(arg) invalid")
     }
@@ -97,9 +101,9 @@ extension FocusCmdArgs {
             return .dfsIndex(dfsIndex)
         }
         switch directionOrRelativeTarget {
-        case .initialized(.directional(let dir)):
+        case .initialized(.cardinal(let dir)):
             return .direction(dir)
-        case .initialized(.dfsRelative(let rel)):
+        case .initialized(.dfs(let rel)):
             return .dfsRelative(rel)
         case .uninitialized:
             error("Parser invariants are broken")
@@ -108,11 +112,6 @@ extension FocusCmdArgs {
 
     public var boundaries: Boundaries { rawBoundaries ?? .workspace }
     public var boundariesAction: WhenBoundariesCrossed { rawBoundariesAction ?? .stop }
-}
-
-public enum DirectionOrRelativeTarget: Equatable, Sendable {
-    case directional(CardinalDirection)
-    case dfsRelative(DfsRelative)
 }
 
 public func parseFocusCmdArgs(_ args: [String]) -> ParsedCmd<FocusCmdArgs> {

@@ -47,7 +47,7 @@ final class ConfigTest: XCTestCase {
             """
         )
         assertEquals(errors, [])
-        let binding = HotkeyBinding(.option, .h, [FocusCommand.new(direction: .left)])
+        let binding = HotkeyBinding(.option, .h, [FocusCommand.new(directionOrRelativeTarget: .cardinal(.left))])
         assertEquals(
             config.modes[mainModeId],
             Mode(name: nil, bindings: [binding.descriptionWithKeyCode: binding])
@@ -84,7 +84,7 @@ final class ConfigTest: XCTestCase {
                 "mode.main.binding.alt-hh: Can\'t parse the key in \'alt-hh\' binding",
             ]
         )
-        let binding = HotkeyBinding(.option, .k, [FocusCommand.new(direction: .up)])
+        let binding = HotkeyBinding(.option, .k, [FocusCommand.new(directionOrRelativeTarget: .cardinal(.up))])
         assertEquals(
             config.modes[mainModeId],
             Mode(name: nil, bindings: [binding.descriptionWithKeyCode: binding])

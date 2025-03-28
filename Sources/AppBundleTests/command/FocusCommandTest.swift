@@ -25,7 +25,7 @@ final class FocusCommandTest: XCTestCase {
 
     func testParse() {
         XCTAssertTrue(parseCommand("focus --boundaries left").errorOrNil?.contains("Possible values") == true)
-        var expected = FocusCmdArgs(rawArgs: [], direction: .left)
+        var expected = FocusCmdArgs(rawArgs: [], directionOrRelativeTarget: .cardinal(.left))
         expected.rawBoundaries = .workspace
         testParseCommandSucc("focus --boundaries workspace left", expected)
 
@@ -56,7 +56,7 @@ final class FocusCommandTest: XCTestCase {
         }
 
         assertEquals(focus.windowOrNil?.windowId, 1)
-        FocusCommand.new(direction: .right).run(.defaultEnv, .emptyStdin)
+        FocusCommand.new(directionOrRelativeTarget: .cardinal(.right)).run(.defaultEnv, .emptyStdin)
         assertEquals(focus.windowOrNil?.windowId, 2)
     }
 
@@ -68,9 +68,9 @@ final class FocusCommandTest: XCTestCase {
         }
 
         assertEquals(focus.windowOrNil?.windowId, 2)
-        FocusCommand.new(direction: .up).run(.defaultEnv, .emptyStdin)
+        FocusCommand.new(directionOrRelativeTarget: .cardinal(.up)).run(.defaultEnv, .emptyStdin)
         assertEquals(focus.windowOrNil?.windowId, 2)
-        FocusCommand.new(direction: .down).run(.defaultEnv, .emptyStdin)
+        FocusCommand.new(directionOrRelativeTarget: .cardinal(.down)).run(.defaultEnv, .emptyStdin)
         assertEquals(focus.windowOrNil?.windowId, 2)
     }
 
@@ -81,7 +81,7 @@ final class FocusCommandTest: XCTestCase {
         }
 
         assertEquals(focus.windowOrNil?.windowId, 1)
-        FocusCommand.new(direction: .left).run(.defaultEnv, .emptyStdin)
+        FocusCommand.new(directionOrRelativeTarget: .cardinal(.left)).run(.defaultEnv, .emptyStdin)
         assertEquals(focus.windowOrNil?.windowId, 1)
     }
 
@@ -92,7 +92,7 @@ final class FocusCommandTest: XCTestCase {
         }
 
         assertEquals(focus.windowOrNil?.windowId, 1)
-        var args = FocusCmdArgs(rawArgs: [], direction: .left)
+        var args = FocusCmdArgs(rawArgs: [], directionOrRelativeTarget: .cardinal(.left))
         args.rawBoundaries = .workspace
         args.rawBoundariesAction = .wrapAroundTheWorkspace
         FocusCommand(args: args).run(.defaultEnv, .emptyStdin)
@@ -118,18 +118,18 @@ final class FocusCommandTest: XCTestCase {
 
         assertEquals(workspace.mostRecentWindowRecursive?.windowId, 3) // The latest bound
         _ = startWindow.focusWindow()
-        FocusCommand.new(direction: .right).run(.defaultEnv, .emptyStdin)
+        FocusCommand.new(directionOrRelativeTarget: .cardinal(.right)).run(.defaultEnv, .emptyStdin)
         assertEquals(focus.windowOrNil?.windowId, 3)
 
         window2.markAsMostRecentChild()
         _ = startWindow.focusWindow()
-        FocusCommand.new(direction: .right).run(.defaultEnv, .emptyStdin)
+        FocusCommand.new(directionOrRelativeTarget: .cardinal(.right)).run(.defaultEnv, .emptyStdin)
         assertEquals(focus.windowOrNil?.windowId, 2)
 
         window3.markAsMostRecentChild()
         unrelatedWindow.markAsMostRecentChild()
         _ = startWindow.focusWindow()
-        FocusCommand.new(direction: .right).run(.defaultEnv, .emptyStdin)
+        FocusCommand.new(directionOrRelativeTarget: .cardinal(.right)).run(.defaultEnv, .emptyStdin)
         assertEquals(focus.windowOrNil?.windowId, 2)
     }
 
@@ -141,7 +141,7 @@ final class FocusCommandTest: XCTestCase {
             }
         }
 
-        FocusCommand.new(direction: .left).run(.defaultEnv, .emptyStdin)
+        FocusCommand.new(directionOrRelativeTarget: .cardinal(.left)).run(.defaultEnv, .emptyStdin)
         assertEquals(focus.windowOrNil?.windowId, 1)
     }
 
@@ -153,13 +153,13 @@ final class FocusCommandTest: XCTestCase {
             }
         }
 
-        FocusCommand.new(direction: .left).run(.defaultEnv, .emptyStdin)
+        FocusCommand.new(directionOrRelativeTarget: .cardinal(.left)).run(.defaultEnv, .emptyStdin)
         assertEquals(focus.windowOrNil?.windowId, 1)
     }
 }
 
 extension FocusCommand {
-    static func new(direction: CardinalDirection) -> FocusCommand {
-        FocusCommand(args: FocusCmdArgs(rawArgs: [], direction: direction))
+    static func new(directionOrRelativeTarget: CardinalOrDfsDirection) -> FocusCommand {
+        FocusCommand(args: FocusCmdArgs(rawArgs: [], directionOrRelativeTarget: directionOrRelativeTarget))
     }
 }
