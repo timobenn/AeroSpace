@@ -20,7 +20,7 @@ aerospace -h;
 
     | flatten-workspace-tree [--workspace <workspace>]
 
-    | focus [<focus_flag>]... (left|down|up|right) [<focus_flag>]...
+    | focus [<focus_flag>]... (left|down|up|right|dfs-next|dfs-prev) [<focus_flag>]...
     | focus --window-id <window_id>
     | focus --dfs-index <number>
 
